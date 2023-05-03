@@ -1,4 +1,5 @@
 import lib.PorterStemmer;
+import lib.RemoveStopWords;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -25,22 +26,28 @@ public class Indexer {
     static Map<Map.Entry<String, Integer>, Integer> freqMap = new HashMap<>();
     static HashMap<String, Integer> hMap = new HashMap<>();
     static HashMap<ObjectId, Boolean> flagMap = new HashMap<>();
+    static HashMap<String, Integer> tfMap = new HashMap<>();
     static String currentLink = null;
     static org.bson.Document doc = null;
+
+    static boolean isSpam = false;
 
     public static void index(MongoCollection collection)
             throws IOException, BrokenBarrierException, InterruptedException {
         WebCrawler.crawl((short) 5);
         dataCollection = collection;
-        // dataCollection.insertOne(new org.bson.Document("Name", "Ahmed"));
+
         HashMap<String, Document> docs = WebCrawler.getDocs();// link and its document
         System.out.println("The docs size is " + docs.size());
-        // Link link = new Link();
+        int x = 1;
         for (Map.Entry<String, Document> doc : docs.entrySet()) {
+            System.out.println("x = " + x++);
             currentLink = doc.getKey();
             encode(doc.getValue(), doc.getKey());
             checkTF();
-            addToDatabase();
+            hMap.clear();
+            if (!isSpam)
+                addToDatabase();
             freqMap.clear();
         }
 
@@ -49,30 +56,29 @@ public class Indexer {
     public static void encode(Document doc, String url) {
         String titleTag = doc.select("title").text();
         // priority --> title - highHeader - description - b - span - p - lowHeaderTag
-        String pTag = doc.select("p").text();
+        String pTag = doc.select("p").text() + " " + doc.select("code").text();
         String highHeaderTag = doc.select("h1").text() + " "
                 + doc.select("h2").text() + " "
                 + doc.select("h3").text();
         String lowHeaderTag = doc.select("h4").text() + " "
                 + doc.select("h5").text() + " "
                 + doc.select("h6").text();
-        String spanTag = doc.select("span").text();
         String descriptionTag = doc.select("meta[name=description]").attr("content");
-        String boldTag = doc.select("b").text() + " " + doc.select("strong").text();
+        String boldTag = doc.select("b").text() + " " + doc.select("strong").text()
+                + " " + doc.select("i").text() + " " + doc.select("em").text()
+                + " " + doc.select("blockquote").text() + " " + doc.select("span").text();
         titleTag = RemoveStopWords.removeStopWords(titleTag);
         pTag = RemoveStopWords.removeStopWords(pTag);
         descriptionTag = RemoveStopWords.removeStopWords(descriptionTag);
         boldTag = RemoveStopWords.removeStopWords(boldTag);
         highHeaderTag = RemoveStopWords.removeStopWords(highHeaderTag);
         lowHeaderTag = RemoveStopWords.removeStopWords(lowHeaderTag);
-        spanTag = RemoveStopWords.removeStopWords(spanTag);
         countWords(titleTag, 0);
-        countWords(pTag, 1);
+        countWords(pTag, 4);
         countWords(descriptionTag, 2);
         countWords(boldTag, 3);
-        countWords(highHeaderTag, 4);
+        countWords(highHeaderTag, 1);
         countWords(lowHeaderTag, 5);
-        countWords(spanTag, 6);
     }
 
     static boolean containsSpecialWord(String str) {
@@ -89,30 +95,29 @@ public class Indexer {
     static void countWords(String str, int priority) {
         String[] words = str.split("\\s+");
         for (String word : words) {
-            if (StringUtil.isNumeric(word)||containsSpecialWord(word))
+            if (StringUtil.isNumeric(word) || containsSpecialWord(word))
                 continue;
             word = porterStemmer.stemWord(word);
             if (freqMap.containsKey(word)) {
                 freqMap.put(Map.entry(word, priority), freqMap.get(word) + 1);
-                hMap.put(word, hMap.get(word) + 1);
             } else {
                 freqMap.put(Map.entry(word, priority), 1);
-                hMap.put(word, 1);
             }
+            if (hMap.containsKey(word))
+                hMap.put(word, hMap.get(word) + 1);
+            else
+                hMap.put(word, 1);
         }
         totalSize += freqMap.size();
     }
 
     static void checkTF() {
         for (Map.Entry<String, Integer> elem : hMap.entrySet()) {
-            if (100.0 * elem.getValue() / totalSize >= 60) {
-                freqMap.remove(Map.entry(elem.getKey(), 0));
-                freqMap.remove(Map.entry(elem.getKey(), 1));
-                freqMap.remove(Map.entry(elem.getKey(), 2));
-                freqMap.remove(Map.entry(elem.getKey(), 3));
-                freqMap.remove(Map.entry(elem.getKey(), 4));
-                freqMap.remove(Map.entry(elem.getKey(), 5));
-                freqMap.remove(Map.entry(elem.getKey(), 6));
+            if (100.0 * elem.getValue() / totalSize >= 50) {
+                isSpam = true;
+                return;
+            } else {
+                tfMap.put(elem.getKey(), (int) Math.round(100.0 * elem.getValue() / totalSize));
             }
         }
     }
@@ -126,13 +131,15 @@ public class Indexer {
             try {
                 org.bson.Document query = new org.bson.Document().append("word", entry.getKey().getKey());
                 doc = new org.bson.Document("priority", entry.getKey().getValue())
-                        .append("count", entry.getValue()+1)
-                        .append("Link", currentLink);
-                filter = Filters.eq("word",entry.getKey().getKey());
-                update = Updates.addToSet("values",doc);
+                        .append("count", entry.getValue() + 1)
+                        .append("Link", currentLink)
+                        .append("TF", tfMap.get(entry.getKey().getKey()));
+                filter = Filters.eq("word", entry.getKey().getKey());
+                update = Updates.addToSet("values", doc);
                 if (dataCollection.find(query).first() != null) {
-                    updateResult = dataCollection.updateOne(filter,update);
-                    System.out.println("An item has updated");
+                    updateResult = dataCollection.updateOne(filter, update);
+                    if (updateResult.getModifiedCount() != 0)
+                        System.out.println("An item has updated");
                 } else {
                     dataCollection.insertOne(
                             new org.bson.Document("word", entry.getKey().getKey())

@@ -3,9 +3,9 @@ import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
-
 import java.io.IOException;
 import java.util.concurrent.BrokenBarrierException;
+import org.bson.Document;
 
 public class Main {
     public static void main(String[] args) throws BrokenBarrierException, IOException, InterruptedException {
@@ -21,8 +21,9 @@ public class Main {
         try (MongoClient mongoClient = MongoClients.create(settings)) {
             try {
                 MongoDatabase database = mongoClient.getDatabase("Indexer");
-                MongoCollection myCollection = database.getCollection("Data");
-                Indexer.index(myCollection);
+                MongoCollection<Document> myCollection = database.getCollection("Data");
+                //Indexer.index(myCollection);
+                QueryProcessor.process("C in life", myCollection);
             } catch (MongoException e) {
                 e.printStackTrace();
             }
