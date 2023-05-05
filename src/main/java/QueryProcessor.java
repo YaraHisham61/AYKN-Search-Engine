@@ -29,13 +29,16 @@ public class QueryProcessor {
     private static MongoCollection<Document>[] myCollection = null;
     private static Object obj = new Object();
     static int mini = 0;
+    private static HashMap<String, org.jsoup.nodes.Document> myDocs = null;
 
-    public static HashMap<String, Link> process(String query, MongoCollection<Document> collection)
+    public static HashMap<String, Link> process(String query, MongoCollection<Document> collection,
+            HashMap<String, org.jsoup.nodes.Document> docs)
             throws InterruptedException {
+        myDocs = docs;
         query = RemoveStopWords.removeStopWords(query);
         words = query.split("\\s+");
         HashSet tempSet = new HashSet<>(Arrays.asList(words));
-        words =(String[]) tempSet.toArray(new String[tempSet.size()]);
+        words = (String[]) tempSet.toArray(new String[tempSet.size()]);
         mini = Math.min(words.length, 5);
         if (words.length == 5) {
             parting = 1;
@@ -62,9 +65,11 @@ public class QueryProcessor {
             temp[index] = new HashMap<>();
             th[index].start();
         }
+        System.out.println("Before Document");
         for (int index = 0; index < mini; index++) {
             th[index].join();
         }
+        System.out.println("After Document");
         HashMap<String, Link> neededMap = new HashMap<>();
         for (int index = 0; index < mini; index++) {
             neededMap.putAll(temp[index]);
@@ -117,52 +122,15 @@ public class QueryProcessor {
                                 linkObj.lowHeaderCount = arr.get(i).getInteger("count");
                                 break;
                         }
-                        synchronized (obj) {
-                            temp[id].put(link, linkObj);
-                        }
+                        temp[id].put(link, linkObj);
                     }
                 }
             }
             for (Map.Entry<String, Link> elem : temp[id].entrySet()) {
-                try {
-                    Connection connection = Jsoup.connect(elem.getKey());
-                    org.jsoup.nodes.Document doc = null;
-                    // try again up to 5 turns
-                    for (int index = 0; index < 3; index++) {
-                        doc = connection.timeout(3000).get();
-                        if (connection.response().statusCode() == 200)
-                            break;
-                    }
-                    elem.getValue().URL = doc;
-                    synchronized (obj) {
-                        temp[id].put(elem.getKey(), elem.getValue());
-                    }
-                } catch (IOException ignore) {
-                }
+                    elem.getValue().URL = myDocs.get(elem.getKey());
+                temp[id].put(elem.getKey(), elem.getValue());
             }
         }
-    }
-
-    static Map<String, Link>[] splitMap(Map<String, Link> map, int numMaps) {
-        int size = map.size();
-        int chunkSize = (int) Math.ceil((double) size / numMaps);
-        Map<String, Link>[] splitMaps = new Map[numMaps];
-
-        int i = 0;
-        int j = 0;
-        for (String key : map.keySet()) {
-            if (splitMaps[i] == null) {
-                splitMaps[i] = new HashMap<>();
-            }
-            splitMaps[i].put(key, map.get(key));
-            j++;
-            if (j >= chunkSize && i < numMaps - 1) {
-                i++;
-                j = 0;
-            }
-        }
-
-        return splitMaps;
     }
 
 }

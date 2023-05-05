@@ -4,8 +4,12 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
+import pojo.LinkDocument;
+
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.ObjectOutputStream;
 import java.util.*;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
@@ -253,6 +257,14 @@ public class WebCrawler extends Thread {
                 hm[3].size() + hm[4].size() + hm[5].size();
         System.out.println("Sorting Finished");
         System.out.println("Crawling finished");
+        ObjectOutputStream outputStream = new ObjectOutputStream(new FileOutputStream("links.txt"));
+        for (Map.Entry<String, Document> doc : docs.entrySet()) {
+            LinkDocument tempLink = new LinkDocument();
+            tempLink.link = doc.getKey();
+            tempLink.document = doc.getValue().toString();
+            outputStream.writeObject(tempLink);
+        }
+        outputStream.close();
 //        System.out.printf("Docs Size = %d", docs.size());
 //        String URL;
 //        Connection con;
