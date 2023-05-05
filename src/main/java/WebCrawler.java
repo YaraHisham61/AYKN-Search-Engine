@@ -281,7 +281,7 @@ public class WebCrawler extends Thread {
 
     }
 
-    private static Map<String, Integer>[] splitMap(Map<String, Integer> map, int numMaps) {
+    static Map<String, Integer>[] splitMap(Map<String, Integer> map, int numMaps) {
         int size = map.size();
         int chunkSize = (int) Math.ceil((double) size / numMaps);
         Map<String, Integer>[] splitMaps = new Map[numMaps];
