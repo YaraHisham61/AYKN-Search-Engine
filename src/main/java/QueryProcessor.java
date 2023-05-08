@@ -38,7 +38,7 @@ public class QueryProcessor {
         words = query.split("\\s+");
         HashSet tempSet = new HashSet<>(Arrays.asList(words));
         words = (String[]) tempSet.toArray(new String[tempSet.size()]);
-        mini = Math.min(words.length, 5);
+        mini = Math.min(words.length, Runtime.getRuntime().availableProcessors());
         if (words.length == 5) {
             parting = 1;
             wordEnding = 5;
