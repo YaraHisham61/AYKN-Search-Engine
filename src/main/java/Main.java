@@ -60,8 +60,8 @@ public class Main {
                     LinkDocument curr = (LinkDocument) objectsList.get(i);
                     docs.put(curr.link, Jsoup.parse(curr.document));
                 }
-
-                testMap = QueryProcessor.process("C in life and C in world", myCollection, docs);
+                Indexer.index(myCollection,docs);
+                // testMap = QueryProcessor.process("CSS in life and CSS in world", myCollection, docs);
                 // System.out.println(testMap.size());
                 System.out.println("Finished...");
             } catch (MongoException e) {

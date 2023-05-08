@@ -1,5 +1,6 @@
 import lib.PorterStemmer;
 import lib.RemoveStopWords;
+import pojo.IndexerLink;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
@@ -12,8 +13,10 @@ import com.mongodb.client.model.Updates;
 import com.mongodb.client.result.UpdateResult;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.regex.Matcher;
@@ -23,34 +26,37 @@ public class Indexer {
     static PorterStemmer porterStemmer = new PorterStemmer();
     static MongoCollection dataCollection = null;
     static int totalSize = 0;
-    static Map<Map.Entry<String, Integer>, Integer> freqMap = new HashMap<>();
+    static HashMap<Map.Entry<String, Integer>, Integer> freqMap = new HashMap<>();
     static HashMap<String, Integer> hMap = new HashMap<>();
     static HashMap<ObjectId, Boolean> flagMap = new HashMap<>();
     static HashMap<String, Integer> tfMap = new HashMap<>();
+    static List<org.bson.Document> documents = new ArrayList<>();
+
+    static HashMap<String, ArrayList<org.bson.Document>> indexerMap = new HashMap<>();
     static String currentLink = null;
     static org.bson.Document doc = null;
 
     static boolean isSpam = false;
 
-    public static void index(MongoCollection collection)
+    public static void index(MongoCollection collection, HashMap<String, Document> docs)
             throws IOException, BrokenBarrierException, InterruptedException {
-        WebCrawler.crawl((short) 5);
         dataCollection = collection;
-
-        HashMap<String, Document> docs = WebCrawler.getDocs();// link and its document
-        System.out.println("The docs size is " + docs.size());
+        System.out.println("Deleting last database");
+        dataCollection.deleteMany(new org.bson.Document());
+        System.out.println("Deleted...");
         int x = 1;
         for (Map.Entry<String, Document> doc : docs.entrySet()) {
-            System.out.println("x = " + x++);
+            System.out.println("Indexer working on link number : " + x++);
             currentLink = doc.getKey();
-            encode(doc.getValue(), doc.getKey());
+            encode(doc.getValue(), currentLink);
             checkTF();
             hMap.clear();
             if (!isSpam)
-                addToDatabase();
+                addNewLink();
             freqMap.clear();
         }
-
+        addToData();
+        System.out.println("Finished Indexing");
     }
 
     public static void encode(Document doc, String url) {
@@ -95,11 +101,11 @@ public class Indexer {
     static void countWords(String str, int priority) {
         String[] words = str.split("\\s+");
         for (String word : words) {
-            if (StringUtil.isNumeric(word) || containsSpecialWord(word))
+            if (containsSpecialWord(word) || word == "\"" || word == "" || word.length() == 1)
                 continue;
             word = porterStemmer.stemWord(word);
-            if (freqMap.containsKey(word)) {
-                freqMap.put(Map.entry(word, priority), freqMap.get(word) + 1);
+            if (freqMap.containsKey(Map.entry(word, priority))) {
+                freqMap.put(Map.entry(word, priority), freqMap.get(Map.entry(word, priority)) + 1);
             } else {
                 freqMap.put(Map.entry(word, priority), 1);
             }
@@ -113,11 +119,58 @@ public class Indexer {
 
     static void checkTF() {
         for (Map.Entry<String, Integer> elem : hMap.entrySet()) {
-            if (100.0 * elem.getValue() / totalSize >= 50) {
+            if (100 * (double) elem.getValue() / totalSize >= 50) {
                 isSpam = true;
                 return;
             } else {
-                tfMap.put(elem.getKey(), (int) Math.round(100.0 * elem.getValue() / totalSize));
+                tfMap.put(elem.getKey(), (int) Math.round(100 * (double) elem.getValue() / totalSize));
+            }
+        }
+    }
+
+    static void addToData() {
+
+        org.bson.Document myDocument;
+        org.bson.Document documentArray;
+        System.out.println(indexerMap.size());
+        int num = 0;
+        int count = indexerMap.size() / 1000;
+        for (Map.Entry<String, ArrayList<org.bson.Document>> elem : indexerMap.entrySet()) {
+            myDocument = new org.bson.Document("word", elem.getKey())
+                    .append("values", elem.getValue());
+            documents.add(myDocument);
+            num++;
+            if (num % 1000 == 0) {
+                System.out.println("Adding to DataBase...");
+                dataCollection.insertMany(documents);
+                documents.clear();
+            }
+        }
+        if (documents.size() != 0)
+            dataCollection.insertMany(documents);
+        documents.clear();
+        System.out.println("Adding to Database Finished.....");
+    }
+
+    static void addNewLink() {
+        ArrayList<org.bson.Document> newArrayList = null;
+        String currWord = "";
+        for (Map.Entry<Map.Entry<String, Integer>, Integer> entry : freqMap.entrySet()) {
+            currWord = entry.getKey().getKey();
+            if (indexerMap.containsKey(currWord)) {
+                newArrayList = indexerMap.get(currWord);
+                newArrayList.add(new org.bson.Document("priority", entry.getKey().getValue())
+                        .append("count", entry.getValue())
+                        .append("TF", tfMap.get(currWord))
+                        .append("Link", currentLink));
+                indexerMap.put(currWord, newArrayList);
+            } else {
+                newArrayList = new ArrayList<>();
+                newArrayList.add(new org.bson.Document("priority", entry.getKey().getValue())
+                        .append("count", entry.getValue())
+                        .append("TF", tfMap.get(currWord))
+                        .append("Link", currentLink));
+                indexerMap.put(currWord, newArrayList);
             }
         }
     }

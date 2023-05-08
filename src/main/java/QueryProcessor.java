@@ -71,7 +71,15 @@ public class QueryProcessor {
         System.out.println("After Document");
         HashMap<Map.Entry<String, String>, Link> neededMap = new HashMap<>();
         for (int index = 0; index < mini; index++) {
-            neededMap.putAll(temp[index]);
+            for (Map.Entry<Map.Entry<String, String>, Link> elem : temp[index].entrySet()) {
+                if (neededMap.containsKey(elem.getKey())) {
+                    Link newLink = elem.getValue();
+                    newLink=neededMap.get(elem.getKey()).addLink(newLink);
+                    neededMap.put(elem.getKey(),newLink);
+                } else {
+                    neededMap.put(elem.getKey(), elem.getValue());
+                }
+            }
         }
         return neededMap;
     }
@@ -95,30 +103,30 @@ public class QueryProcessor {
                     arr = (ArrayList<Document>) document.get("values");
                     for (int i = 0; i < arr.size(); i++) {
                         link = (String) arr.get(i).get("Link");
-                        if (!temp[id].containsKey(link)) {
+                        if (!temp[id].containsKey(Map.entry(link, words[index]))) {
                             linkObj = new Link();
                             linkObj.TF = arr.get(i).getInteger("TF");
                         } else {
-                            linkObj = temp[id].get(link);
+                            linkObj = temp[id].get(Map.entry(link, words[index]));
                         }
                         switch (arr.get(i).getInteger("priority")) {
                             case 0:
-                                linkObj.titleCount = arr.get(i).getInteger("count");
+                                linkObj.titleCount += arr.get(i).getInteger("count");
                                 break;
                             case 1:
-                                linkObj.highHeaderCount = arr.get(i).getInteger("count");
+                                linkObj.highHeaderCount += arr.get(i).getInteger("count");
                                 break;
                             case 2:
-                                linkObj.descriptionCount = arr.get(i).getInteger("count");
+                                linkObj.descriptionCount += arr.get(i).getInteger("count");
                                 break;
                             case 3:
-                                linkObj.boldCount = arr.get(i).getInteger("count");
+                                linkObj.boldCount += arr.get(i).getInteger("count");
                                 break;
                             case 4:
-                                linkObj.pCount = arr.get(i).getInteger("count");
+                                linkObj.pCount += arr.get(i).getInteger("count");
                                 break;
                             default:
-                                linkObj.lowHeaderCount = arr.get(i).getInteger("count");
+                                linkObj.lowHeaderCount += arr.get(i).getInteger("count");
                                 break;
                         }
                         temp[id].put(Map.entry(link, words[index]), linkObj);
@@ -126,7 +134,7 @@ public class QueryProcessor {
                 }
             }
             for (Map.Entry<Map.Entry<String, String>, Link> elem : temp[id].entrySet()) {
-                elem.getValue().URL = myDocs.get(elem.getKey());
+                elem.getValue().URL = myDocs.get(elem.getKey().getKey());
                 temp[id].put(elem.getKey(), elem.getValue());
             }
         }
