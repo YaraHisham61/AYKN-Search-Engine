@@ -54,14 +54,14 @@ public class WebCrawler extends Thread {
             end = count;
         try {
             for (int i = start; i < end; i++) {
-                if (currentThread().isInterrupted()) {
+                if (Thread.interrupted()) {
                     arr[currNum - 1] = i;
                     arrEnd[currNum - 1] = end;
                 }
                 try {
                     theURL = ls.get(i);
                     con = Jsoup.connect(theURL);
-                    doc = con.timeout(3000).ignoreContentType(true).get();
+                    doc = con.timeout(3000).userAgent("Mozilla/5.0").ignoreContentType(true).get();
                     if (con.response().statusCode() != 200) {
                         continue;
                     }
@@ -119,7 +119,7 @@ public class WebCrawler extends Thread {
                             temp.equals("https://www.pinterest.com/foxbroadcasting/"))
                         continue;
                     con = Jsoup.connect(temp);
-                    doc = con.timeout(3000).get();
+                    doc = con.timeout(3000).userAgent("Mozilla/5.0").get();
                     if (con.response().statusCode() != 200) {
                         continue;
                     }
@@ -166,7 +166,7 @@ public class WebCrawler extends Thread {
                 size++;
                 m[num].put(s, 1);
                 Connection connection = Jsoup.connect(s);
-                Document doc = connection.timeout(3000).get();
+                Document doc = connection.timeout(3000).userAgent("Mozilla/5.0").get();
                 if (connection.response().statusCode() != 200)
                     return;
                 if (doc.title() == "" || doc.title() == " ")
@@ -275,7 +275,7 @@ public class WebCrawler extends Thread {
 //                if (!docs.containsKey(element.getKey())) {
 //                    try {
 //                        URL = element.getKey();
-//                        con = Jsoup.connect(URL).timeout(3000);
+//                        con = Jsoup.connect(URL).timeout(3000).userAgent("Mozilla/5.0");
 //                        doc = con.get();
 //                        if (con.response().statusCode() != 200)
 //                            continue;
