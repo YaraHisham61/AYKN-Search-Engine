@@ -14,13 +14,14 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.BrokenBarrierException;
 import org.bson.Document;
 import org.jsoup.Jsoup;
 
 public class Main {
     public static void main(String[] args) throws BrokenBarrierException, IOException, InterruptedException {
-        HashMap<String, Link> testMap = null;
+        HashMap<Map.Entry<String, String>, Link> testMap = null;
         String connectionString = "mongodb+srv://ahmedmohamed202:HacKeR2233@cluster0.lfmmw9l.mongodb.net/test";
         ServerApi serverApi = ServerApi.builder()
                 .version(ServerApiVersion.V1)
@@ -54,7 +55,7 @@ public class Main {
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
-                
+
                 for (int i = 0; i < objectsList.size(); i++) {
                     LinkDocument curr = (LinkDocument) objectsList.get(i);
                     docs.put(curr.link, Jsoup.parse(curr.document));

@@ -21,17 +21,16 @@ import lib.RemoveStopWords;
 public class QueryProcessor {
     // the document and the count equation
     // count=count of specific priority * priority
-    private static HashMap<String, Link>[] temp = null;
+    private static HashMap<Map.Entry<String, String>, Link>[] temp = null;
     private static String[] words = null;
     private static HashSet[] wordsSet = null;
     private static int parting = 0;
     private static int wordEnding = 0;
     private static MongoCollection<Document>[] myCollection = null;
-    private static Object obj = new Object();
     static int mini = 0;
     private static HashMap<String, org.jsoup.nodes.Document> myDocs = null;
 
-    public static HashMap<String, Link> process(String query, MongoCollection<Document> collection,
+    public static HashMap<Map.Entry<String, String>, Link> process(String query, MongoCollection<Document> collection,
             HashMap<String, org.jsoup.nodes.Document> docs)
             throws InterruptedException {
         myDocs = docs;
@@ -70,7 +69,7 @@ public class QueryProcessor {
             th[index].join();
         }
         System.out.println("After Document");
-        HashMap<String, Link> neededMap = new HashMap<>();
+        HashMap<Map.Entry<String, String>, Link> neededMap = new HashMap<>();
         for (int index = 0; index < mini; index++) {
             neededMap.putAll(temp[index]);
         }
@@ -122,12 +121,12 @@ public class QueryProcessor {
                                 linkObj.lowHeaderCount = arr.get(i).getInteger("count");
                                 break;
                         }
-                        temp[id].put(link, linkObj);
+                        temp[id].put(Map.entry(link, words[index]), linkObj);
                     }
                 }
             }
-            for (Map.Entry<String, Link> elem : temp[id].entrySet()) {
-                    elem.getValue().URL = myDocs.get(elem.getKey());
+            for (Map.Entry<Map.Entry<String, String>, Link> elem : temp[id].entrySet()) {
+                elem.getValue().URL = myDocs.get(elem.getKey());
                 temp[id].put(elem.getKey(), elem.getValue());
             }
         }
