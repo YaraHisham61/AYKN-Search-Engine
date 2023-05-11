@@ -23,7 +23,6 @@ public class QueryProcessor {
     // count=count of specific priority * priority
     private static HashMap<Map.Entry<String, String>, Link>[] temp = null;
     private static String[] words = null;
-    private static HashSet[] wordsSet = null;
     private static int parting = 0;
     private static int wordEnding = 0;
     private static MongoCollection<Document>[] myCollection = null;
