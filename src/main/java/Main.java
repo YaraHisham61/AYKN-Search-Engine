@@ -16,6 +16,7 @@ import org.jsoup.Jsoup;
 
 public class Main {
     static HashMap<String, org.jsoup.nodes.Document> docs;
+    static HashMap<String,Double> scores=new HashMap<>();
 
     public static void main(String[] args) throws BrokenBarrierException, IOException, InterruptedException {
         HashMap<Map.Entry<String, String>, Link> testMap = null;
@@ -32,16 +33,18 @@ public class Main {
             try {
                 MongoDatabase database = mongoClient.getDatabase("Indexer");
                 MongoCollection<Document> myCollection = database.getCollection("Data");
-                WebCrawler.crawl((short) 10);
-                // HashMap<String, org.jsoup.nodes.Document> docs = WebCrawler.getDocs();
-                // Indexer.index(myCollection);
+                WebCrawler.crawl((short) Runtime.getRuntime().availableProcessors());
+                //docs = WebCrawler.getDocs();
+                //Indexer.index(myCollection,docs);
                 System.out.println("Connected...");
-                // getFromFile();
-                // docs = new HashMap<>();
-                // Indexer.index(myCollection,docs);
-                // testMap = QueryProcessor.process("CSS in life and CSS in world", myCollection, docs);
+                docs = new HashMap<>();
+               getFromFile();
+
+//                 Indexer.index(myCollection,docs);
+                 testMap = QueryProcessor.process("cancel and half hamlet", myCollection, docs,scores);
                 // System.out.println(testMap.size());
                 System.out.println("Finished...");
+
             } catch (MongoException e) {
                 e.printStackTrace();
             }
@@ -64,5 +67,23 @@ public class Main {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        try {
+            ObjectInputStream objectInputStream = new ObjectInputStream(new FileInputStream("scores.txt"));
+            while (true) {
+                try {
+                    PageRank currLink = (PageRank) objectInputStream.readObject();
+                    System.out.println(currLink.link);
+                    System.out.println(currLink.score);
+                    scores.put(currLink.link, currLink.score);
+                } catch (EOFException e) {
+                    break;
+                }
+            }
+            objectInputStream.close();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
     }
 }

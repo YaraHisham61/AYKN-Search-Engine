@@ -6,10 +6,7 @@ import org.jsoup.select.Elements;
 
 import pojo.LinkDocument;
 
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.ObjectOutputStream;
+import java.io.*;
 import java.util.*;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.CyclicBarrier;
@@ -36,6 +33,37 @@ public class WebCrawler extends Thread {
     static Scanner scanner;
     static ArrayList<String> ls = new ArrayList<>();
     static int count = 0;
+
+    static HashMap<String, Double> scores = new HashMap<>();
+    static HashMap<String, HashMap<String, Integer>> pagerank = new HashMap<String, HashMap<String, Integer>>();
+
+    static void paging(int iterations, double dampingfactor) throws IOException {
+        for (int i = 1; i < iterations; i++) {
+            for (String onePage : pagerank.keySet()) {
+                double sum = 0;
+
+                for (String parents : pagerank.get(onePage).keySet()) {
+                    double ranko = scores.get(parents);
+                    int grandparents = pagerank.get(parents).size();
+                    if (grandparents == 0) sum += ranko; //seedLink it's hashMap size = 0
+                    else sum += (ranko / grandparents);
+                    /*if (sum == 0) {
+                        System.out.println();
+                    }*/
+
+                }
+                if (pagerank.get(onePage).size() != 0)
+                    scores.put(onePage, sum);
+            }
+        }
+        //System.out.println(scores);
+        ObjectOutputStream outputStream = new ObjectOutputStream(new FileOutputStream("scores.txt"));
+        for (String link : scores.keySet()) {
+            PageRank tempLink = new PageRank(scores.get(link), link);
+            outputStream.writeObject(tempLink);
+        }
+        outputStream.close();
+    }
 
     public WebCrawler() throws IOException {
     }
@@ -71,6 +99,7 @@ public class WebCrawler extends Thread {
                     Elements links = doc.select("a[href]");
                     System.out.printf("The link is :- %s\nThe title is :- %s\n\n", theURL, doc.title());
                     for (Element e : links) {
+
                         temp = e.attr("href");
 
                         if ((!temp.contains("https://")
@@ -78,17 +107,20 @@ public class WebCrawler extends Thread {
                             continue;
                         }
                         if (temp.contains(".com"))
-                            addition.increment(temp, 0);
+                            addition.increment(temp, 0, theURL);
                         else if (temp.contains(".net"))
-                            addition.increment(temp, 1);
+                            addition.increment(temp, 1, theURL);
                         else if (temp.contains(".edu"))
-                            addition.increment(temp, 2);
+                            addition.increment(temp, 2, theURL);
                         else if (temp.contains(".gov"))
-                            addition.increment(temp, 3);
+                            addition.increment(temp, 3, theURL);
                         else if (temp.contains(".org"))
-                            addition.increment(temp, 4);
+                            addition.increment(temp, 4, theURL);
                         else
-                            addition.increment(temp, 5);
+                            addition.increment(temp, 5, theURL);
+
+                      //  docs.put(temp, doc);
+
                     }
                 } catch (Exception e) {
                     continue;
@@ -112,7 +144,7 @@ public class WebCrawler extends Thread {
             for (Map.Entry<String, Integer> entry : splittedMaps[currNum - 1].entrySet()) {
                 try {
                     temp = entry.getKey();
-                    if (docs.size() >= 150) {
+                    if (docs.size() >= 100) {
                         finished = true;
                         break;
                     }
@@ -127,20 +159,22 @@ public class WebCrawler extends Thread {
                     }
 
                     docs.put(temp, doc);
+                    String Mylink = temp;
+
                     Elements links = doc.select("a[href]");
                     for (Element e : links) {
                         temp = e.attr("href");
                         if (temp.contains("/docs")
                                 || temp.contains("/logs")
                                 || (!temp.contains("https://")
-                                        && !temp.contains("http://"))) {
+                                && !temp.contains("http://"))) {
                             continue;
                         }
-                        if (docs.size() >= 150) {
+                        if (docs.size() >= 100) {
                             finished = true;
                             break;
                         }
-                        addition.incrementLink(temp, num);
+                        addition.incrementLink(temp, num, Mylink);
                     }
                 } catch (Exception ignore) {
                 }
@@ -148,33 +182,64 @@ public class WebCrawler extends Thread {
 
             try {
                 cyclicBarrier.await();
+                System.out.println("out of barrier" + currNum);
             } catch (InterruptedException | BrokenBarrierException e) {
                 throw new RuntimeException(e);
             }
             if (finished)
                 break;
         }
-
     }
 
     static class Addition {
-        public synchronized void increment(String s, int num) {
+        public synchronized void increment(String s, int num, String ref) {
             if (m[num].containsKey(s))
                 m[num].merge(s, 1, Integer::sum);
             else {
                 size++;
                 m[num].put(s, 1);
             }
+//            if (!pagerank.containsKey(s)) {
+//                HashMap<String, Integer> tempo = new HashMap<String, Integer>();
+//                tempo.put(ref, 1);
+//                pagerank.put(s, tempo);
+//                //pagerank.get(s).put("yara", 1);
+//            } else {
+//                pagerank.get(s).put(ref, 1);
+//            }
+//            scores.put(s, 1.0);
+//            if (!scores.containsKey(ref))
+//                scores.put(ref, 1.0);////Ahmed ???????
+//            if (!ls.contains(s))
+//                ls.add(s);
         }
 
-        public synchronized void incrementLink(String s, int num) throws IOException {
+        public synchronized void incrementLink(String s, int num, String ref) throws IOException {
+            if (!pagerank.containsKey(s)) {
+                HashMap<String, Integer> tempo = new HashMap<String, Integer>();
+                tempo.put(ref, 1);
+                pagerank.put(s, tempo);
+                //pagerank.get(s).put("yara", 1);
+            } else {
+                for (String y : pagerank.get(s).keySet())
+                    System.out.println(y);
+
+                System.out.println(pagerank.get(s).size());
+                pagerank.get(s).put(ref, 1);
+                System.out.println(pagerank.get(s).size());
+            }
+            scores.put(s, 1.0);
+            if (!scores.containsKey(ref))
+                scores.put(ref, 1.0);////Ahmed ???????
+            if (!ls.contains(s))
+                ls.add(s);
             if (m[num].containsKey(s))
                 m[num].merge(s, 1, Integer::sum);
             else {
                 size++;
                 m[num].put(s, 1);
                 Connection connection = Jsoup.connect(s);
-                Document doc = connection.timeout(3000).userAgent("Mozilla/5.0").get();
+                Document doc = connection.timeout(3000).get();
                 if (connection.response().statusCode() != 200)
                     return;
                 if (doc.title() == "" || doc.title() == " ")
@@ -193,7 +258,7 @@ public class WebCrawler extends Thread {
         // Sort the list
         Collections.sort(list, new Comparator<Map.Entry<String, Integer>>() {
             public int compare(Map.Entry<String, Integer> o1,
-                    Map.Entry<String, Integer> o2) {
+                               Map.Entry<String, Integer> o2) {
                 return (o1.getValue()).compareTo(o2.getValue());
             }
         });
@@ -221,10 +286,21 @@ public class WebCrawler extends Thread {
         while (scanner.hasNextLine()) {
             ls.add(scanner.nextLine());
         }
+        for (String seedLink : ls) {
+            pagerank.put(seedLink, new HashMap<String, Integer>());
+            scores.put(seedLink, 4.0);
+        }
+
         System.out.println("Reading Links Finished");
         count = ls.size();
         System.out.println("Size is  " + count);
         noOfThreads = args;
+        splittedMaps = new HashMap[noOfThreads];
+
+        for(int i = 0 ; i < noOfThreads;i++)
+        {
+            splittedMaps[i]=new HashMap<>();
+        }
         if (noOfThreads == 0 || noOfThreads > count)
             noOfThreads = (short) count;
         arr = new int[noOfThreads];
@@ -243,17 +319,27 @@ public class WebCrawler extends Thread {
         // openedSize = m[0].size() + m[1].size() + m[2].size() + m[3].size() +
         // m[4].size() + m[5].size();
         System.out.println("Working on fetching");
-        while (docs.size() < 150 && num < 6) {
+//        for(int i = 0 ; i < noOfThreads;i++)
+//        {
+//            splittedMaps[i]=new HashMap<>();
+//        }
+
+        while (docs.size() < 100 && num < 6) {
             num++;
             // if (num == 0)
             // break;
-            splittedMaps = splitMap(m[num], noOfThreads);
+            if (m[num].size() != 0) {
+                splittedMaps = splitMap(m[num], noOfThreads);
+            } else {
+                num = -1;
+                continue;
+            }
             cyclicBarrier.await();
             System.out.println("Size is  " + size);
             cyclicBarrier.await();
         }
         System.out.println("Finished fetching");
-        // cyclicBarrier.await();
+        //cyclicBarrier.await();
         for (int i = 0; i < noOfThreads; i++) {
             th[i].join();
         }
@@ -303,6 +389,7 @@ public class WebCrawler extends Thread {
         //
         // }
         // }
+        paging(2, .85);
 
     }
 
