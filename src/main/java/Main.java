@@ -33,15 +33,15 @@ public class Main {
             try {
                 MongoDatabase database = mongoClient.getDatabase("Indexer");
                 MongoCollection<Document> myCollection = database.getCollection("Data");
-                WebCrawler.crawl((short) Runtime.getRuntime().availableProcessors());
+                WebCrawler.crawl((short) (5));
                 //docs = WebCrawler.getDocs();
                 //Indexer.index(myCollection,docs);
                 System.out.println("Connected...");
                 docs = new HashMap<>();
-               getFromFile();
+            //    getFromFile();
 
 //                 Indexer.index(myCollection,docs);
-                 testMap = QueryProcessor.process("cancel and half hamlet", myCollection, docs,scores);
+                //  testMap = QueryProcessor.process("cancel and half hamlet", myCollection, docs,scores);
                 // System.out.println(testMap.size());
                 System.out.println("Finished...");
 
