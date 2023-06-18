@@ -1,4 +1,4 @@
-package pojo;
+package com.example;
 
 public class IndexerLink {
     int priority;
