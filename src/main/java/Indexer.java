@@ -1,12 +1,11 @@
-import lib.PorterStemmer;
-import lib.RemoveStopWords;
-import pojo.IndexerLink;
+package com.example;
 
 import org.bson.conversions.Bson;
 import org.bson.types.ObjectId;
-import org.jsoup.internal.StringUtil;
 import org.jsoup.nodes.Document;
 
+import com.example.lib.PorterStemmer;
+import com.example.lib.RemoveStopWords;
 import com.mongodb.client.MongoCollection;
 import com.mongodb.client.model.Filters;
 import com.mongodb.client.model.Updates;

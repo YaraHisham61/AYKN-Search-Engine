@@ -1,25 +1,22 @@
-import java.io.IOException;
+package com.example;
+
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.Map;
 
 import org.bson.Document;
-import org.jsoup.Connection;
-import org.jsoup.Jsoup;
 
+import com.example.lib.PorterStemmer;
+import com.example.lib.RemoveStopWords;
 import com.mongodb.client.MongoCollection;
-
-import lib.PorterStemmer;
-import lib.RemoveStopWords;
 
 /**
  * QueryProcessor
  */
 public class QueryProcessor {
-    
+
     // the document and the count equation
     // count=count of specific priority * priority
     private static HashMap<Map.Entry<String, String>, Link>[] temp = null;
@@ -27,66 +24,80 @@ public class QueryProcessor {
     private static int parting = 0;
     private static int wordEnding = 0;
     private static MongoCollection<Document>[] myCollection = null;
+    ArrayList<Results> results = new ArrayList<>();
+
     static int mini = 0;
     private static HashMap<String, org.jsoup.nodes.Document> myDocs = null;
+    static HashMap<String, Double> scores;
+    public static String myquery;
 
-    public static HashMap<Map.Entry<String, String>, Link> process(String query, MongoCollection<Document> collection,
-            HashMap<String, org.jsoup.nodes.Document> docs,HashMap<String,Double>scores)
+    public static ArrayList<Results> process(String query, MongoCollection<Document> collection,
+            HashMap<String, org.jsoup.nodes.Document> docs, HashMap<String, Double> s)
             throws InterruptedException {
-        if(query.charAt(0)=='"')
-            phraseSearch1(query,collection,docs,scores);
-
-        myDocs = docs;
-        query = RemoveStopWords.removeStopWords(query);
-        words = query.split("\\s+");
-        HashSet tempSet = new HashSet<>(Arrays.asList(words));
-        words = (String[]) tempSet.toArray(new String[tempSet.size()]);
-        mini = Math.min(words.length, Runtime.getRuntime().availableProcessors());
-        if (words.length == 5) {
-            parting = 1;
-            wordEnding = 5;
-        } else if (words.length > 5) {
-            parting = words.length / 5;
-            wordEnding = words.length;
+        myquery = query;
+        scores = s;
+        if (query.charAt(0) == '"' && query.charAt(query.length() - 1) == '"') {
+            mini =  Runtime.getRuntime().availableProcessors();
+            myCollection = new MongoCollection[mini];
+            for (int i = 0; i < mini; i++) {
+                myCollection[i] = collection;
+            }
+            return phraseSearch1(query, collection, myDocs, scores);
         } else {
-            parting = 1;
-            wordEnding = words.length;
-        }
-        myCollection = new MongoCollection[mini];
-        for (int i = 0; i < mini; i++) {
-            myCollection[i] = collection;
-        }
-        ThreadedQuery tQuery = new ThreadedQuery();
-        Thread[] th = new Thread[mini];
-        for (int index = 0; index < mini; index++) {
-            th[index] = new Thread(tQuery);
-            th[index].setName(String.valueOf(index));
-        }
-        temp = new HashMap[mini];
-        for (int index = 0; index < mini; index++) {
-            temp[index] = new HashMap<>();
-            th[index].start();
-        }
-        System.out.println("Before Document");
-        for (int index = 0; index < mini; index++) {
-            th[index].join();
-        }
-        System.out.println("After Document");
-        HashMap<Map.Entry<String, String>, Link> neededMap = new HashMap<>();
-        for (int index = 0; index < mini; index++) {
-            for (Map.Entry<Map.Entry<String, String>, Link> elem : temp[index].entrySet()) {
-                if (neededMap.containsKey(elem.getKey())) {
-                    Link newLink = elem.getValue();
-                    newLink=neededMap.get(elem.getKey()).addLink(newLink);
-                    neededMap.put(elem.getKey(),newLink);
-                } else {
-                    neededMap.put(elem.getKey(), elem.getValue());
+
+            myDocs = docs;
+            query = RemoveStopWords.removeStopWords(query);
+            words = query.split("\\s+");
+            HashSet tempSet = new HashSet<>(Arrays.asList(words));
+            words = (String[]) tempSet.toArray(new String[tempSet.size()]);
+            mini = Math.min(words.length, Runtime.getRuntime().availableProcessors());
+
+            if (words.length == 5) {
+                parting = 1;
+                wordEnding = 5;
+            } else if (words.length > 5) {
+                parting = words.length / 5;
+                wordEnding = words.length;
+            } else {
+                parting = 1;
+                wordEnding = words.length;
+            }
+            myCollection = new MongoCollection[mini];
+            for (int i = 0; i < mini; i++) {
+                myCollection[i] = collection;
+            }
+            ThreadedQuery tQuery = new ThreadedQuery();
+            Thread[] th = new Thread[mini];
+            for (int index = 0; index < mini; index++) {
+                th[index] = new Thread(tQuery);
+                th[index].setName(String.valueOf(index));
+            }
+            temp = new HashMap[mini];
+            for (int index = 0; index < mini; index++) {
+                temp[index] = new HashMap<>();
+                th[index].start();
+            }
+            System.out.println("Before Document");
+            for (int index = 0; index < mini; index++) {
+                th[index].join();
+            }
+            System.out.println("After Document");
+            HashMap<Map.Entry<String, String>, Link> neededMap = new HashMap<>();
+            for (int index = 0; index < mini; index++) {
+                for (Map.Entry<Map.Entry<String, String>, Link> elem : temp[index].entrySet()) {
+                    if (neededMap.containsKey(elem.getKey())) {
+                        Link newLink = elem.getValue();
+                        newLink = neededMap.get(elem.getKey()).addLink(newLink);
+                        neededMap.put(elem.getKey(), newLink);
+                    } else {
+                        neededMap.put(elem.getKey(), elem.getValue());
+                    }
                 }
             }
+            Ranker r = new Ranker(words, neededMap, myDocs, scores, myquery);
+            return r.rank();
+            //return r.document();
         }
-        Ranker r = new Ranker(words,neededMap,docs,scores);
-        r.rank();
-        return neededMap;
     }
 
     static private class ThreadedQuery extends Thread {
@@ -144,124 +155,128 @@ public class QueryProcessor {
             }
         }
     }
-    public static HashMap<String, Integer> phraseSearch1(String query, MongoCollection<Document> collection, HashMap<String, org.jsoup.nodes.Document> docs,HashMap<String,Double>scores) throws InterruptedException {
-        myDocs = docs;
 
+    public static ArrayList<Results> phraseSearch1(String query, MongoCollection<Document> collection,
+            HashMap<String, org.jsoup.nodes.Document> docs, HashMap<String, Double> scores)
+            throws InterruptedException {
+        myquery=query;
+        myDocs = docs;
+        HashMap<String, Integer> finalll=null;
+       finalll = new HashMap();
         String query2 = query;
         String query1 = query;
-        int o=0;
+        int o = 0;
         String[] who = query.split("\\s+");
         int andorand = -1;
         int ind = -1;
         for (int i = 0; i < who.length; i++) {
-            if (who[i].equals("and"))
-            {
+            if (who[i].equals("and")) {
                 andorand = 1;
                 ind = i;
                 break;
             }
-            if (who[i].equals("or"))
-            {
+            if (who[i].equals("or")) {
                 ind = i;
                 andorand = 2;
                 break;
             }
-            if (who[i].equals("not"))
-            {
+            if (who[i].equals("not")) {
                 ind = i;
                 andorand = 3;
                 break;
             }
-            o+=who[i].length()+1;
+            o += who[i].length() + 1;
         }
         if (andorand == -1) {
-            return search(who, collection, docs);
-        }
-        if (andorand == 1) {
-            query1 = query1.substring(0, o-1);
-            query2 = query2.substring(o+4, query2.length());
+            finalll = search(who, collection, docs);
+        } else if (andorand == 1) {
+            query1 = query1.substring(0, o - 1);
+            query2 = query2.substring(o + 4, query2.length());
             query1 = RemoveStopWords.removeStopWords(query1);
             query2 = RemoveStopWords.removeStopWords(query2);
             String[] wo1 = query1.split("\\s+");
             String[] wo2 = query2.split("\\s+");
             HashMap<String, Integer> res1 = search(wo1, collection, docs);
             HashMap<String, Integer> res2 = search(wo2, collection, docs);
-            HashMap<String, Integer> result = new HashMap<>();
-            for (Map.Entry<String, Integer> elem1 : res1.entrySet())
-            {
-                for (Map.Entry<String, Integer> elem2 : res2.entrySet())
-                {
-                    if(elem1.getKey().equals(elem2.getKey()))
-                    {
-                        result.put(elem1.getKey(),elem1.getValue());
+            HashMap<String, Integer> result =null;
+            result= new HashMap<>();
+            for (Map.Entry<String, Integer> elem1 : res1.entrySet()) {
+                for (Map.Entry<String, Integer> elem2 : res2.entrySet()) {
+                    if (elem1.getKey().equals(elem2.getKey())) {
+                        result.put(elem1.getKey(), elem1.getValue());
                     }
                 }
             }
-            return result;
-        }
-        if (andorand == 2) {
-            query1 = query1.substring(0, o-1);
-            query2 = query2.substring(o+3, query2.length());
+            finalll = result;
+        } else if (andorand == 2) {
+            query1 = query1.substring(0, o - 1);
+            query2 = query2.substring(o + 3, query2.length());
             query1 = RemoveStopWords.removeStopWords(query1);
             query2 = RemoveStopWords.removeStopWords(query2);
             String[] wo1 = query1.split("\\s+");
             String[] wo2 = query2.split("\\s+");
-            HashMap<String, Integer> res = search(wo1, collection, docs);
+            HashMap<String, Integer> res=null;
+            res= search(wo1, collection, docs);
             res.putAll(search(wo2, collection, docs));
-            return res;
-        }
-        if (andorand == 3) {
-            query1 = query1.substring(0, o-1);
-            query2 = query2.substring(o+4, query2.length());
+            finalll = res;
+        } else if (andorand == 3) {
+            query1 = query1.substring(0, o - 1);
+            query2 = query2.substring(o + 4, query2.length());
             query1 = RemoveStopWords.removeStopWords(query1);
             query2 = RemoveStopWords.removeStopWords(query2);
             String[] wo1 = query1.split("\\s+");
             String[] wo2 = query2.split("\\s+");
             HashMap<String, Integer> res1 = search(wo1, collection, docs);
             HashMap<String, Integer> res2 = search(wo2, collection, docs);
-            HashMap<String, Integer> result = new HashMap<>();
-            for (Map.Entry<String, Integer> elem1 : res1.entrySet())
-            {
-                boolean flag=false;
-                for (Map.Entry<String, Integer> elem2 : res2.entrySet())
-                {
-                    if(elem1.getKey().equals(elem2.getKey()))
-                    {
-                        flag=true;
+            HashMap<String, Integer> result =null;
+            result= new HashMap<>();
+            for (Map.Entry<String, Integer> elem1 : res1.entrySet()) {
+                boolean flag = false;
+                for (Map.Entry<String, Integer> elem2 : res2.entrySet()) {
+                    if (elem1.getKey().equals(elem2.getKey())) {
+                        flag = true;
                         break;
                     }
                 }
-                if(flag==false)
-                {
-                    result.put(elem1.getKey(),elem1.getValue());
+                if (flag == false) {
+                    result.put(elem1.getKey(), elem1.getValue());
                 }
             }
-            return result;
-        }
-        return null;
+            finalll = result;
+        } else
+            finalll = null;
+        Ranker r = new Ranker(null, null, docs, scores, myquery);
+        return r.phraserank(finalll);
     }
 
-    public static HashMap<String, Integer> search(String[] words, MongoCollection<Document> collection, HashMap<String, org.jsoup.nodes.Document> docs) throws InterruptedException {
+    public static HashMap<String, Integer> search(String[] words, MongoCollection<Document> collection,
+            HashMap<String, org.jsoup.nodes.Document> docs) throws InterruptedException {
         myDocs = docs;
         HashMap<String, Integer> havelinks = new HashMap<>();
         ArrayList<Document> arr = null;
         for (int i = 0; i < words.length; i++) {
-            Document docQuery = new Document("word",Indexer.porterStemmer.stemWord(words[i]));
+            Document docQuery = new Document("word", Indexer.porterStemmer.stemWord(words[i]));
             String link;
-            for (Document document : collection.find(docQuery)) {
-                arr = (ArrayList<Document>) document.get("values");
-                HashSet<String> currLinks = new HashSet<>();
-                for (int j = 0; j < arr.size(); j++) {
-                    link = (String) arr.get(j).get("Link");
-                    currLinks.add(link);
-                }
-                for (String elem : currLinks) {
-                    if (havelinks.containsKey(elem)) {
-                        havelinks.put(elem, havelinks.get(elem) + 1);
-                    } else havelinks.put(elem, 1);
-                }
-            }
+            words[i]=words[i].replaceAll("[^a-zA-Z0-9\\s]", "");
+try{
+    for (Document document : collection.find(docQuery)) {
+        arr = (ArrayList<Document>) document.get("values");
+        HashSet<String> currLinks = new HashSet<>();
+        for (int j = 0; j < arr.size(); j++) {
+            link = (String) arr.get(j).get("Link");
+            currLinks.add(link);
         }
+        for (String elem : currLinks) {
+            if (havelinks.containsKey(elem)) {
+                havelinks.put(elem, havelinks.get(elem) + 1);
+            } else
+                havelinks.put(elem, 1);
+        }
+    }
+}catch (Exception e){
+    e.getStackTrace();
+}}
+
         HashMap<String, Integer> Linkes = new HashMap<>();
         for (Map.Entry<String, Integer> elem : havelinks.entrySet()) {
             if (elem.getValue() != words.length)
@@ -273,22 +288,22 @@ public class QueryProcessor {
             boolean exit = false;
             boolean f = false;
             org.jsoup.nodes.Document doc = docs.get(elem.getKey());
+//            String url=elem.getKey();
             String text = doc.text();
             text = text.toUpperCase();
             String[] textsearch = text.split("\\s+");
-            //System.out.println(words.length);
-            for (int i = 0; i < words.length; i++)
-            {
-                //words[i] = Indexer.porterStemmer.stemWord(words[i]);
+            // System.out.println(words.length);
+
+            for (int i = 0; i < words.length; i++) {
+                // words[i] = Indexer.porterStemmer.stemWord(words[i]);
                 int k;
                 if (i == 0)
                     k = 0;
                 else
                     k = arr123[i - 1];
-                for (int j = k; j < textsearch.length; j++)
-                {
-                    if (i==0&&words[i].equals(textsearch[j]))
-                    {
+                for (int j = k; j < textsearch.length; j++) {
+                    words[i]=words[i].toUpperCase();
+                    if (i == 0 && words[i].equals(textsearch[j])) {
                         arr123[i] = j;
                         break;
                     }
@@ -311,16 +326,17 @@ public class QueryProcessor {
                 if (i > 0 && arr123[i] == -1) {
                     exit = true;
                 }
+                if (i > 0 && arr123[i] - arr123[i - 1] <= 10) {
+                    exit = true;
+                }
                 if (exit == true) {
                     f = true;
                     break;
                 }
             }
-            if (f == false)
-            {
+            if (f == false) {
                 int sum = 0;
-                for (int o = 0; o < words.length; o++)
-                {
+                for (int o = 0; o < words.length; o++) {
                     sum += arr123[o];
                 }
                 Linkes.put(elem.getKey(), sum);
@@ -328,5 +344,4 @@ public class QueryProcessor {
         }
         return Linkes;
     }
-
 }

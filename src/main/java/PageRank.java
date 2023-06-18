@@ -1,5 +1,6 @@
+package com.example;
+
 import java.io.Serializable;
-import java.util.HashMap;
 
 public class PageRank implements Serializable {
     Double score;

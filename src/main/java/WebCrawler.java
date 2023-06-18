@@ -1,10 +1,10 @@
+package com.example;
+
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-
-import pojo.LinkDocument;
 
 import java.io.*;
 import java.util.*;
@@ -40,6 +40,7 @@ public class WebCrawler extends Thread {
     static int count = 0;
     static int criticalSize = 0;
     static int neededSize = 0;
+    static int oversize=0;
 
     static HashMap<String, Double> scores = new HashMap<>();
     static HashMap<String, HashMap<String, Double>> pagerank = new HashMap<String, HashMap<String, Double>>();
@@ -89,17 +90,22 @@ public class WebCrawler extends Thread {
         // }
         // }
         // }
-        for (Map.Entry<String, Double> map : scores.entrySet()) {
-            fileWriter2.write(map.getKey());
-            fileWriter2.write("\n");
-        }
+//        for (Map.Entry<String, Double> map : scores.entrySet()) {
+//            fileWriter2.write(map.getKey());
+//            fileWriter2.write("\n");
+//        }
         // System.out.println(scores);
-        ObjectOutputStream outputStream = new ObjectOutputStream(new FileOutputStream("scores.txt"));
+        FileOutputStream fos2 = new FileOutputStream("scores.txt");
+        ObjectOutputStream oos2 = new ObjectOutputStream(fos2);
         for (String link : scores.keySet()) {
             PageRank tempLink = new PageRank(scores.get(link), link);
-            outputStream.writeObject(tempLink);
+            oos2.writeObject(tempLink);
         }
-        outputStream.close();
+        oos2.close();
+        fos2.close();
+//        ObjectOutputStream outputStream = new ObjectOutputStream(new FileOutputStream("E:\\Collage\\APT\\ProjectAhmed\\APT_project\\scores.txt",true));
+//
+//        outputStream.close();
     }
 
     public WebCrawler() throws IOException {
@@ -119,7 +125,7 @@ public class WebCrawler extends Thread {
             end = count;
         try {
             for (int i = start; i < end; i++) {
-                if (totalSizeOfMaps() >= criticalSize)
+                if (totalSizeOfMaps() >= oversize)
                     break;
                 if (Thread.interrupted()) {
                     arr[currNum - 1] = i;
@@ -146,7 +152,7 @@ public class WebCrawler extends Thread {
                                 && !temp.contains("http://"))) {
                             continue;
                         }
-                        if (totalSizeOfMaps() >= criticalSize)
+                        if (totalSizeOfMaps() >= oversize)
                             break;
                         if (temp.contains(".com"))
                             addition.increment(temp, 0, theURL);
@@ -218,7 +224,7 @@ public class WebCrawler extends Thread {
                             if (temp.contains("/docs")
                                     || temp.contains("/logs")
                                     || (!temp.contains("https://")
-                                            && !temp.contains("http://"))) {
+                                    && !temp.contains("http://"))) {
                                 continue;
                             }
                             addition.incrementLink(temp, num, Mylink);
@@ -311,7 +317,7 @@ public class WebCrawler extends Thread {
         // Sort the list
         Collections.sort(list, new Comparator<Map.Entry<String, Integer>>() {
             public int compare(Map.Entry<String, Integer> o1,
-                    Map.Entry<String, Integer> o2) {
+                               Map.Entry<String, Integer> o2) {
                 return (o1.getValue()).compareTo(o2.getValue());
             }
         });
@@ -331,7 +337,8 @@ public class WebCrawler extends Thread {
         fileWriter = new FileWriter(testStream);
         fileWriter2 = new FileWriter(testStream2);
         docs = new HashMap<>();
-        criticalSize = 20;
+        criticalSize = 1000;
+        oversize=criticalSize+2000;
         scanner = new Scanner(file);
         m[0] = new HashMap<>();
         m[1] = new HashMap<>();
@@ -342,6 +349,7 @@ public class WebCrawler extends Thread {
         while (scanner.hasNextLine()) {
             ls.add(scanner.nextLine());
         }
+        scanner.close();
         for (String seedLink : ls) {
             pagerank.put(seedLink, new HashMap<String, Double>());
             scores.put(seedLink, 4.0);
@@ -396,26 +404,27 @@ public class WebCrawler extends Thread {
             th[i].join();
         }
         System.out.println("Size is  " + size);
-        Map<String, Integer> hm[] = new HashMap[6];
-        System.out.println("Sorting Started");
-        for (int i = 0; i < 6; i++) {
-            hm[i] = sortByValue(m[i]);
-        }
-        System.out.println("Sorting Finished");
         System.out.println("Crawling finished");
 
-        ObjectOutputStream outputStream = new ObjectOutputStream(new FileOutputStream("links.txt"));
+        FileOutputStream fos = new FileOutputStream("links.txt");
+        ObjectOutputStream oos = new ObjectOutputStream(fos);
         for (Map.Entry<String, Document> doc : docs.entrySet()) {
             LinkDocument tempLink = new LinkDocument();
             tempLink.link = doc.getKey();
             tempLink.document = doc.getValue().html();
-            outputStream.writeObject(tempLink);
+            oos.writeObject(tempLink);
         }
-        outputStream.close();
-        for (Map.Entry<String, Document> map : docs.entrySet()) {
-            fileWriter.write(map.getKey());
-            fileWriter.write("\n");
-        }
+        oos.close();
+        fos.close();
+//        ObjectOutputStream outputStream = new ObjectOutputStream(
+//                new FileOutputStream("E:\\Collage\\APT\\ProjectAhmed\\APT_project\\links.txt", true)); // Appendf
+////        ObjectOutputStream outputStream = new ObjectOutputStream(new FileOutputStream("links.txt"));
+//
+//        outputStream.close();
+//        for (Map.Entry<String, Document> map : docs.entrySet()) {
+//            fileWriter.write(map.getKey());
+//            fileWriter.write("\n");
+//        }
 
         // String URL;
         // Connection con;

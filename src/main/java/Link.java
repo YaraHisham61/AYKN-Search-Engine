@@ -1,3 +1,5 @@
+package com.example;
+
 import org.jsoup.nodes.Document;
 
 public class Link {
