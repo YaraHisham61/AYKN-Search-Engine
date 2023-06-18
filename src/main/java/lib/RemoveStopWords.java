@@ -1,4 +1,4 @@
-package lib;
+package com.example.lib;
 public class RemoveStopWords {
     private static final String[] STOP_WORDS = { "I", "a", "above", "after",
             "against", "all", "alone", "always", "am", "amount", "an",

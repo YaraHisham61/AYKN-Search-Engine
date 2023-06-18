@@ -1,15 +1,34 @@
-package lib;
+package com.example.lib;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 
 public class PorterStemmer {
 
-    /**
-     * @param word the word to stem
-     * @return the stem of the word, in lowercase.
-     */
+//    /**
+//     * @param word the word to stem
+//     * @return the stem of the word, in lowercase.
+//     */
+    public String stemming(String text)
+    {
+
+        List<String> queryWords = Arrays.asList(text.split("\\s+"));
+        List<String> stemmedWords = new ArrayList<>();
+        for(String s:queryWords)
+        {
+            stemmedWords.add(stemWord(s));
+        }
+        text=stemmedWords.toString();
+        text= text.replaceAll(",","");
+        text = text.replaceAll("\\[", "");
+        text= text.replaceAll("]","");
+        return text;
+    }
     public String stemWord(String word) {
         String stem = word.toLowerCase(Locale.getDefault());
+        stem=stem.replaceAll("[^a-zA-Z0-9\\s]", "");
         if (stem.length() < 3) return stem;
         stem = stemStep1a(stem);
         stem = stemStep1b(stem);
